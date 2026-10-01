@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Onluk Bozarak Çıkarma İşlemi ve Taban Blokları Modellemesi</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --accent: #f59e0b;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #cbd5e1;
+      --rod-color: #3b82f6;
+      --unit-color: #fbbf24;
+      --broken-color: #ef4444;
+    }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: #1e293b;
+      margin: 0;
+      padding: 16px;
+    }
+    .container {
+      max-width: 950px;
+      margin: 0 auto;
+    }
+    .header {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 16px 20px;
+      border-radius: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      color: var(--primary);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+      color: #0f172a;
+      border-bottom: 2px solid #f1f5f9;
+      padding-bottom: 8px;
+    }
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-check { background: var(--success); color: white; }
+    .btn-anim { background: #8b5cf6; color: white; }
+
+    /* --- ANİMASYON ALANI --- */
+    .anim-container {
+      background: #0f172a;
+      border-radius: 12px;
+      padding: 20px;
+      color: white;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      min-height: 240px;
+    }
+    .anim-display {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 30px;
+      margin-top: 15px;
+      min-height: 180px;
+    }
+    .group-box {
+      border: 2px dashed #475569;
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .blocks-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-end;
+      margin-top: 10px;
+    }
+    /* Taban Blokları Çizimleri */
+    .ten-rod {
+      width: 14px;
+      height: 130px;
+      background: repeating-linear-gradient(
+        to bottom,
+        var(--rod-color),
+        var(--rod-color) 11px,
+        #1e3a8a 11px,
+        #1e3a8a 13px
+      );
+      border: 1px solid #1e40af;
+      border-radius: 2px;
+      transition: all 0.5s ease;
+    }
+    .one-cube {
+      width: 12px;
+      height: 12px;
+      background: var(--unit-color);
+      border: 1px solid #d97706;
+      border-radius: 2px;
+      display: inline-block;
+      transition: all 0.4s ease;
+    }
+    .crossed-out {
+      position: relative;
+      opacity: 0.35;
+    }
+    .crossed-out::after {
+      content: "✕";
+      position: absolute;
+      color: var(--danger);
+      font-weight: 900;
+      font-size: 16px;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    /* Animasyon Dönüşüm Efekti */
+    @keyframes breakTen {
+      0% { transform: scale(1) translateY(0); filter: hue-rotate(0deg); }
+      50% { transform: scale(1.15) translateY(-15px); filter: hue-rotate(90deg); }
+      100% { transform: scale(0) translateY(20px); opacity: 0; }
+    }
+    .breaking {
+      animation: breakTen 1s forwards ease-in-out;
+    }
+    @keyframes spawnUnits {
+      0% { transform: scale(0); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .spawned {
+      animation: spawnUnits 0.6s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    /* --- ÇALIŞMA SAYFASI VE İŞLEM TABLOSU --- */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: center;
+      font-size: 0.95rem;
+    }
+    th { background: #f1f5f9; }
+    input[type="number"] {
+      width: 50px;
+      height: 38px;
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      outline: none;
+    }
+    input:focus { border-color: var(--primary); }
+    .correct { background: #dcfce7 !important; border-color: var(--success) !important; color: #15803d; }
+    .wrong { background: #fee2e2 !important; border-color: var(--danger) !important; color: #b91c1c; }
+
+    /* Defter İşlem Formatı */
+    .operation-board {
+      display: inline-block;
+      font-family: monospace;
+      font-size: 1.5rem;
+      padding: 18px 28px;
+      background: #f8fafc;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+    }
+    .board-cell {
+      display: inline-block;
+      width: 44px;
+      text-align: center;
+    }
+    .cross-top {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      text-decoration: line-through;
+    }
+    .top-borrow-box {
+      width: 32px !important;
+      height: 30px !important;
+      font-size: 0.85rem !important;
+      border-radius: 50% !important;
+      border: 2px dashed #f59e0b !important;
+      background: #fef3c7 !important;
+    }
+    .chalk-line {
+      border-top: 3px solid #334155;
+      margin: 8px 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>Onluk Bozarak Çıkarma (Taban Blokları Modeli)</h1>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-anim" onclick="animasyonuBaslat()">▶ Canlandırmayı Oynat</button>
+      <button class="btn btn-primary" onclick="yeniSoruUret()">🎲 Yeni Soru Üret</button>
+    </div>
+  </div>
+
+  <!-- 1. PEDAGOJİK ANİMASYON VİTRİNİ -->
+  <div class="card" style="padding: 12px;">
+    <h2>1. Adım: Onluk Bozma Modellemesi (Animasyon)</h2>
+    <div class="anim-container">
+      <div id="anim-mesaj" style="color: #38bdf8; font-size: 0.95rem; font-weight: 500;">
+        "Birlikler yetmediğinde komşudan 1 onluk alırız ve onu 10 tane birliğe dönüştürürüz!"
+      </div>
+      <div class="anim-display">
+        <!-- Onluklar -->
+        <div class="group-box" style="min-width: 140px;">
+          <span style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 6px;">ONLUKLAR (Onluk Çubuklar)</span>
+          <div class="blocks-row" id="anim-onluklar"></div>
+        </div>
+        <!-- Dönüşüm Oku -->
+        <div id="anim-ok" style="font-size: 2rem; color: #f59e0b; opacity: 0; transition: opacity 0.5s;">➔</div>
+        <!-- Birlikler -->
+        <div class="group-box" style="min-width: 240px;">
+          <span style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 6px;">BİRLİKLER (Birlik Kareler)</span>
+          <div class="blocks-row" id="anim-birlikler"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. BASAMAK DEĞERLERİ TABLOSU -->
+  <div class="card">
+    <h2>2. Adım: Basamak Değeri Ayrıştırma</h2>
+    <p style="font-size: 0.85rem; color: #64748b; margin-top: -6px;">
+      Eksilen ve çıkan sayıların basamak ve sayı değerlerini uygun kutulara yaz.
+    </p>
+    <div id="basamak-tablo-alani"></div>
+  </div>
+
+  <!-- 3. ÖĞRENCİ ÇALIŞMA ALANI -->
+  <div class="card" style="text-align: center;">
+    <h2>3. Adım: İşlemi Kendin Uygula ve Çöz</h2>
+    <p style="font-size: 0.85rem; color: #64748b;">
+      Birlikler yetmiyorsa onluktan 1 eksiltip üstteki kutucuklara yeni değerleri yaz, ardından farkı bul.
+    </p>
+
+    <div class="operation-board" id="islem-tahtasi"></div>
+
+    <div style="margin-top: 18px;">
+      <button class="btn btn-check" onclick="cevaplariKontrolEt()">✔ Cevaplarımı Kontrol Et</button>
+      <div id="sonuc-bildirimi" style="margin-top: 10px; font-weight: bold;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let eksilen = 52;
+let cikan = 27;
+
+function rastgeleOnlukBozmali() {
+  // Birlik basamağı mutlaka eksilen < cikan olacak şekilde seçilir
+  let e_onlar = Math.floor(Math.random() * 5) + 4; // 4 - 8
+  let e_birler = Math.floor(Math.random() * 4) + 1; // 1 - 4
+  
+  let c_onlar = Math.floor(Math.random() * (e_onlar - 2)) + 1; // e_onlar'dan küçük
+  let c_birler = Math.floor(Math.random() * 4) + 6; // 6 - 9 (Böylece e_birler < c_birler garantilenir)
+
+  eksilen = e_onlar * 10 + e_birler;
+  cikan = c_onlar * 10 + c_birler;
+}
+
+function yeniSoruUret() {
+  rastgeleOnlukBozmali();
+  document.getElementById("sonuc-bildirimi").innerHTML = "";
+  tabloyuCiz();
+  tahtayiCiz();
+  animasyonuHazirla();
+}
+
+function animasyonuHazirla() {
+  const onlukDiv = document.getElementById("anim-onluklar");
+  const birlikDiv = document.getElementById("anim-birlikler");
+  const ok = document.getElementById("anim-ok");
+  const msg = document.getElementById("anim-mesaj");
+
+  onlukDiv.innerHTML = "";
+  birlikDiv.innerHTML = "";
+  ok.style.opacity = "0";
+
+  let e_onlar = Math.floor(eksilen / 10);
+  let e_birler = eksilen % 10;
+
+  msg.innerHTML = `Eksilen Sayı: <strong>${eksilen}</strong> (${e_onlar} Onluk, ${e_birler} Birlik). ${e_birler} birlikten çıkanın birlikleri çıkarılamıyor!`;
+
+  for (let i = 0; i < e_onlar; i++) {
+    let rod = document.createElement("div");
+    rod.className = "ten-rod";
+    rod.id = `rod-${i}`;
+    onlukDiv.appendChild(rod);
+  }
+
+  for (let i = 0; i < e_birler; i++) {
+    let cube = document.createElement("div");
+    cube.className = "one-cube";
+    birlikDiv.appendChild(cube);
+  }
+}
+
+function animasyonuBaslat() {
+  animasyonuHazirla();
+  const e_onlar = Math.floor(eksilen / 10);
+  const e_birler = eksilen % 10;
+  const msg = document.getElementById("anim-mesaj");
+  const ok = document.getElementById("anim-ok");
+
+  msg.innerHTML = "1 Onluk çubuğu alınıp birlikler basamağına taşınıyor...";
+  ok.style.opacity = "1";
+
+  const targetRod = document.getElementById(`rod-${e_onlar - 1}`);
+  if (!targetRod) return;
+  targetRod.classList.add("breaking");
+
+  setTimeout(() => {
+    targetRod.style.display = "none";
+    msg.innerHTML = "1 Onluk = 10 Birlik! Birlikler basamağında artık " + (e_birler + 10) + " birlik var.";
+    
+    const birlikDiv = document.getElementById("anim-birlikler");
+    for (let k = 0; k < 10; k++) {
+      let cube = document.createElement("div");
+      cube.className = "one-cube spawned";
+      birlikDiv.appendChild(cube);
+    }
+  }, 950);
+}
+
+function tabloyuCiz() {
+  const alan = document.getElementById("basamak-tablo-alani");
+  let e_onlar = Math.floor(eksilen / 10);
+  let e_birler = eksilen % 10;
+  let c_onlar = Math.floor(cikan / 10);
+  let c_birler = cikan % 10;
+
+  alan.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Sayı</th>
+          <th>Onlar Bas. Sayı Değeri</th>
+          <th>Onlar Bas. Değeri</th>
+          <th>Birler Bas. Sayı Değeri</th>
+          <th>Birler Bas. Değeri</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Eksilen (${eksilen})</strong></td>
+          <td><input type="number" class="check-input" data-exp="${e_onlar}"></td>
+          <td><input type="number" class="check-input" data-exp="${e_onlar * 10}" style="width:70px;"></td>
+          <td><input type="number" class="check-input" data-exp="${e_birler}"></td>
+          <td><input type="number" class="check-input" data-exp="${e_birler}" style="width:70px;"></td>
+        </tr>
+        <tr>
+          <td><strong>Çıkan (${cikan})</strong></td>
+          <td><input type="number" class="check-input" data-exp="${c_onlar}"></td>
+          <td><input type="number" class="check-input" data-exp="${c_onlar * 10}" style="width:70px;"></td>
+          <td><input type="number" class="check-input" data-exp="${c_birler}"></td>
+          <td><input type="number" class="check-input" data-exp="${c_birler}" style="width:70px;"></td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
+
+function tahtayiCiz() {
+  const board = document.getElementById("islem-tahtasi");
+  let e_onlar = Math.floor(eksilen / 10);
+  let e_birler = eksilen % 10;
+  let c_onlar = Math.floor(cikan / 10);
+  let c_birler = cikan % 10;
+  let fark = eksilen - cikan;
+  let f_onlar = Math.floor(fark / 10);
+  let f_birler = fark % 10;
+
+  // Onluk bozulunca tepede kalan yeni değerler
+  let yeni_onlar = e_onlar - 1;
+  let yeni_birler = e_birler + 10;
+
+  board.innerHTML = `
+    <div style="margin-bottom: 6px;">
+      <span class="board-cell"></span>
+      <input type="number" class="check-input top-borrow-box" data-exp="${yeni_onlar}" placeholder="?">
+      <input type="number" class="check-input top-borrow-box" data-exp="${yeni_birler}" placeholder="?">
+    </div>
+    <div>
+      <span class="board-cell"></span>
+      <span class="board-cell cross-top">${e_onlar}</span>
+      <span class="board-cell cross-top">${e_birler}</span>
+    </div>
+    <div>
+      <span class="board-cell" style="color:var(--danger)">-</span>
+      <span class="board-cell">${c_onlar}</span>
+      <span class="board-cell">${c_birler}</span>
+    </div>
+    <div class="chalk-line"></div>
+    <div>
+      <span class="board-cell"></span>
+      <input type="number" class="check-input" data-exp="${f_onlar}">
+      <input type="number" class="check-input" data-exp="${f_birler}">
+    </div>
+  `;
+}
+
+function cevaplariKontrolEt() {
+  const inputs = document.querySelectorAll(".check-input");
+  let correct = 0;
+  let total = inputs.length;
+
+  inputs.forEach(inp => {
+    let val = inp.value.trim();
+    let exp = inp.getAttribute("data-exp");
+    if (val === exp) {
+      inp.classList.remove("wrong");
+      inp.classList.add("correct");
+      correct++;
+    } else {
+      inp.classList.remove("correct");
+      inp.classList.add("wrong");
+    }
+  });
+
+  const notify = document.getElementById("sonuc-bildirimi");
+  if (correct === total) {
+    notify.style.color = "var(--success)";
+    notify.innerHTML = `Tebrikler! Hem basamakları hem de onluk bozarak yapılan işlemi kusursuz çözdün (${total}/${total}).`;
+  } else {
+    notify.style.color = "var(--danger)";
+    notify.innerHTML = `Eksikler var: ${total} kutudan ${correct} tanesi doğru. Kırmızı kutuları kontrol et.`;
+  }
+}
+
+// Sayfa yüklendiğinde başlat
+window.onload = yeniSoruUret;
+</script>
+
+</body>
+</html>
